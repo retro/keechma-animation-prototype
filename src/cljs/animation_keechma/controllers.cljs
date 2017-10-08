@@ -11,21 +11,8 @@
 
 (.config Promise #js {:cancellation true})
 (def calc (spring/make-calculator {:tension 200 :friction 7 :overshoot-clamping? false}))
-(def calc-2 (spring/make-calculator {:tension 10 :friction 7}))
+(def calc-2 (spring/make-calculator {:tension 200 :friction 4}))
 
-(def fwd
-  {:color ["#228b22" "#ff0000"]
-   :size [100 200]
-   :radius [0 100]
-   :rotation [0 90]
-   :alpha [1 0]})
-
-(def back
-  {:color ["#ff0000" "#228b22"]
-   :size [200 100]
-   :radius [100 0]
-   :rotation [90 0]
-   :alpha [0 1]})
 
 (def anim-path [:kv :anim-state])
 
@@ -75,59 +62,65 @@
                       ((if forward? add-end-frames add-start-frames) frames (- max-frames-count frames-count)))
                animation))) animations)))
 
-(defn play-animation! [app-db id forward? & animations]
+(defn compute-frames [app-db id forward? animations]
   (let [current-state (vec (get-in app-db [:kv id-key id]))
         animations-with-frames
         (vec (map-indexed (fn [idx animation]
                             (assoc animation :frames (calculate-frames animation forward? (get current-state idx))))
                           animations))
 
-        max-frames-count (apply max (map #(count (:frames %)) animations-with-frames))
-        normalized (-> animations-with-frames
-                       (add-delay forward? max-frames-count)
-                       (normalize-frames forward?))
-        final-frame-count (count (:frames (first normalized)))
-        get-frame-values (fn [frame]
-                           (map (fn [animation]
-                                  (assoc-in (get-in animation [:frames frame])
-                                            [:keechma.toolbox/anim-state :forward?] forward?))
-                                normalized))]
+        max-frames-count (apply max (map #(count (:frames %)) animations-with-frames))]
+    (-> animations-with-frames
+        (add-delay forward? max-frames-count)
+        (normalize-frames forward?))))
+
+(defn get-values-for-frame [animations forward? frame]
+  (map (fn [animation]
+         (assoc-in (get-in animation [:frames frame])
+                   [:keechma.toolbox/anim-state :forward?] forward?))
+       animations))
+
+(defn play-animation! [app-db id forward? animations]
+  (let [normalized (compute-frames app-db id forward? animations)
+        final-frame-count (count (:frames (first normalized)))]
     (pp/make-pipeline
      {:begin (reduce (fn [acc i]
                        (if (= 0 i)
                          (conj acc
                                (fn [value app-db]
-                                 (pp/commit! (assoc-in app-db [:kv id-key id] (get-frame-values i)))))
+                                 (pp/commit! (assoc-in app-db [:kv id-key id]
+                                                       (get-values-for-frame normalized forward? i)))))
                          (concat acc
                                  [raf-promise
                                   (fn [value app-db]
-                                    (pp/commit! (assoc-in app-db [:kv id-key id] (get-frame-values i))))])))
+                                    (pp/commit! (assoc-in app-db [:kv id-key id]
+                                                          (get-values-for-frame normalized forward? i))))])))
                      [] (range 0 final-frame-count))
       :rescue [(fn [value app-db error]
                  (println error))]})))
 
+(defn render-first-frame [app-db id forward? animations]
+  (let [normalized (compute-frames app-db id forward? animations)]
+    (assoc-in app-db [:kv id-key id] (get-values-for-frame normalized forward? 0))))
 
-
-
+(def animations
+  [{:values {:radius [0 100]
+             :alpha [1 0]
+             :rotation [0 90]}
+    :calculator calc}
+   {:values {:color ["#228b22" "#ff0000"]
+             :size [100 200]}
+    :calculator calc-2
+    :delay 50}])
 
 (def anim-controller
   (pp-controller/constructor
    (fn [] 
      true)
    {:start (pipeline! [value app-db]
-             
-             (rescue! [error]
-               (println error)))
+             (pp/commit! (render-first-frame app-db :animation true animations)))
     :animation (pp/exclusive (pipeline! [value app-db]
-                               (play-animation! app-db :animation (= :forward value)
-                                                {:values {:radius [0 100]
-                                                          :alpha [1 0]
-                                                          :rotation [0 90]}
-                                                 :calculator calc}
-                                                {:values {:color ["#228b22" "#ff0000"]
-                                                          :size [100 200]}
-                                                 :calculator calc
-                                                 :delay 50})))}))
+                               (play-animation! app-db :animation (= :forward value) animations)))}))
 
 (def controllers
   {:anim anim-controller})
