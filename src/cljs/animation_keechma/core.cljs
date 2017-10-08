@@ -5,7 +5,7 @@
    [animation-keechma.ui-system :refer [ui-system]]
    [animation-keechma.subscriptions :refer [subscriptions]]
    [animation-keechma.controllers :refer [controllers]]
-   [animation-keechma.spring :refer [make-calculator]]
+   [animation-keechma.spring :as spring :refer [make-calculator]]
    ))
 
 
@@ -35,10 +35,8 @@
     (enable-console-print!)))
 
 (defn reload []
-  (let [current @running-app
-        calc (make-calculator 40 7)]
-    (.clear js/console)
-    (println (:frames (calc 0 1)))
+  (let [current @running-app]
+    (.clear js/console) 
     (if current
       (app-state/stop! current start-app!)
       (start-app!))))
