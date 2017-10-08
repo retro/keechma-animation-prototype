@@ -28,9 +28,9 @@
 (defn update-velocity [state velocity]
   (assoc-in state [:current :velocity] velocity))
 
-(defn update-at-rest [state] 
+(defn update-at-rest [state]
   (if (or (state-at-rest? state)
-          (and (:overshoot-clamping? state) (state-overshooting? state)))
+          (and (get-in state [:config :overshoot-clamping?]) (state-overshooting? state)))
     (let [new-state (if (pos? (get-in state [:config :tension]))
                       (-> state
                           (assoc :start (:end state))
@@ -190,6 +190,7 @@
 
 (defn rgb->hex [[r g b]]
   (color/rgbToHex r g b))
+
 (defn hex->rgb [hex]
   (js->clj (color/hexToRgb hex)))
 
@@ -224,5 +225,5 @@
     (map (fn [v]
            (reduce-kv (fn [m k [start end]]
                         (let [mapper (if (and (string? start) (string? end)) interpolate-color map-value-in-range)]
-                          (assoc m k (mapper (:position v) start end))))
-                      {:keechma.toolbox/anim-state v} props)) anim-frames)))
+                          (assoc-in m [:values k] (mapper (:position v) start end))))
+                      {:keechma.toolbox/anim-state v :values {}} props)) anim-frames)))

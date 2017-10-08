@@ -6,118 +6,126 @@
             [promesa.impl :refer [Promise]]
             ["dynamics.js" :as dyn]
             [animation-keechma.spring :as spring :refer [make-calculator]])
+  (:import [goog.async AnimationDelay])
   (:require-macros [cljs.core.async.macros :refer [go-loop]]))
 
 (.config Promise #js {:cancellation true})
+(def calc (spring/make-calculator {:tension 200 :friction 7 :overshoot-clamping? false}))
+(def calc-2 (spring/make-calculator {:tension 10 :friction 7}))
 
-;; (defn animate-step [make-promise]
-;;   (pipeline! [value app-db]
-;;     (when (not (get-in app-db [:kv :anim-state :done?]))
-;;       (pipeline! [value app-db]
-;;         (make-promise)
-;;         (pp/commit! (assoc-in app-db [:kv :anim-state] value))
-;;         (when-not (:done? value)
-;;           (animate-step make-promise))))))
-
-;; (def start {:radius 0
-;;             :color "#f30"
-;;             :size 1})
-
-;; (def end {:radius 100
-;;           :color "#000"
-;;           :size 2})
-
-;; (defn animate! [start end]
-;;   (let [anim-chan (chan)
-;;         make-promise (fn []
-;;                        (p/promise (fn [resolve _]
-;;                                     (take! anim-chan resolve))))]
-;;     (put! anim-chan {:value start :done? false})
-;;     (.animate dyn (clj->js start) (clj->js end)
-;;               #js {:type (.-spring dyn)
-;;                    :duration 5000
-;;                    :change (fn [val progress]
-;;                              (let [done? (= progress 1)]
-;;                                (put! anim-chan {:value (js->clj val :keywordize-keys true)
-;;                                                 :done? done?})))})
-;;     (animate-step make-promise)))
-
-
-;; (def anim-controller
-;;   (pp-controller/constructor
-;;    (fn [_] true)
-;;    {:animation (pp/exclusive
-;;                 (pipeline! [value app-db]
-;;                   (when (= :restart value)
-;;                     (pipeline! [value app-db]
-;;                       (pp/commit! (assoc-in app-db [:kv :anim-state] nil))
-;;                       :start))
-;;                   (when (= :start value)
-;;                     (pipeline! [value app-db]
-;;                       (println "BEFORE ANIMATE" value)
-;;                       (animate! (or (get-in app-db [:kv :anim-state :value]) start) end)
-;;                       (println "AFTER ANIMATE" value)))))
-;;     :reset (pipeline! [value app-db]
-;;              (pp/commit! (assoc-in app-db [:kv :anim-state] {:done? false :value start})))}))
-
-(def calc (spring/make-calculator {:tension 40 :friction 7}))
 (def fwd
-  {:color ["#ff3300" "#0000ff"]
-   :size [100 400]
-   :radius [0 100]})
+  {:color ["#228b22" "#ff0000"]
+   :size [100 200]
+   :radius [0 100]
+   :rotation [0 90]
+   :alpha [1 0]})
 
 (def back
-  {:color ["#0000ff" "#f30"]
-   :size [400 100]
-   :radius [100 0]})
+  {:color ["#ff0000" "#228b22"]
+   :size [200 100]
+   :radius [100 0]
+   :rotation [90 0]
+   :alpha [0 1]})
 
 (def anim-path [:kv :anim-state])
 
-(defn make-pipeline [path id frames]
-  
-  (pp/make-pipeline
-   {:begin (reduce-kv 
-            (fn [m k frame]
-              (if (= k 0)
-                (conj m (fn [value app-db]
-                          (pp/commit! (assoc-in app-db path {:id id :value frame}))))
-                (concat m
-                        [(fn [value app-db]
-                           (p/promise (fn [resolve reject]
-                                        (.requestAnimationFrame js/window resolve))))
-                         (fn [value app-db]
-                           (pp/commit! (assoc-in app-db path {:id id :value frame})))]))) [] (vec frames))}))
+(defn raf-promise []
+  (p/promise (fn [resolve reject]
+               (let [anim-delay (AnimationDelay. resolve)]
+                 (.start anim-delay)))))
+
+(def id-key :keechma.toolbox.animation/id)
 
 (defn reverse-position [anim-state]
   (when anim-state
     (update anim-state :position #(.abs js/Math (- % 1)))))
 
-(defn calculate-forward [app-db path]
-  (let [current-state (get-in app-db path)
-        id (:id current-state)
-        anim-state (get-in current-state [:value :keechma.toolbox/anim-state])]
-    (if (= :forward id)
-      anim-state
-      (reverse-position anim-state))))
+(defn calculate-frames [{:keys [calculator values]} forward? current-state]
+  (let [values (if forward? values (reduce-kv (fn [m k v] (assoc m k (reverse v))) {} values))
+        state (get current-state :keechma.toolbox/anim-state)
+        start-state (if (= forward? (:forward? state)) state (reverse-position state))]
+    (vec (spring/calculate-frames calculator values start-state))))
 
-(defn calculate-back [app-db path]
-  (let [current-state (get-in app-db path)
-        id (:id current-state)
-        anim-state (get-in current-state [:value :keechma.toolbox/anim-state])]
-    (if (= :back id)
-      anim-state
-      (reverse-position anim-state))))
+(defn delay-to-frames-count [frames-count delay]
+  (.round js/Math (* frames-count (/ delay 100))))
+
+(defn add-start-frames [frames frame-count]
+  (into (vec (repeat frame-count (first frames))) frames))
+
+(defn add-end-frames [frames frame-count]
+  (into frames (repeat frame-count (last frames))))
+
+(defn add-delay [animations forward? max-frames-count]
+  (map (fn [animation]
+         (if-let [delay (:delay animation)]
+           (assoc animation :frames
+                  ((if forward? add-start-frames add-end-frames)
+                   (:frames animation) (delay-to-frames-count delay max-frames-count)))
+           animation)) animations))
+
+(defn normalize-frames [animations forward?]
+  (let [max-frames-count (apply max (map #(count (:frames %)) animations))]
+    (map (fn [animation]
+           (let [frames (:frames animation)
+                 frames-count (count frames)]
+             (if (not= max-frames-count frames-count)
+               (assoc animation :frames
+                      ((if forward? add-end-frames add-start-frames) frames (- max-frames-count frames-count)))
+               animation))) animations)))
+
+(defn play-animation! [app-db id forward? & animations]
+  (let [current-state (vec (get-in app-db [:kv id-key id]))
+        animations-with-frames
+        (vec (map-indexed (fn [idx animation]
+                            (assoc animation :frames (calculate-frames animation forward? (get current-state idx))))
+                          animations))
+
+        max-frames-count (apply max (map #(count (:frames %)) animations-with-frames))
+        normalized (-> animations-with-frames
+                       (add-delay forward? max-frames-count)
+                       (normalize-frames forward?))
+        final-frame-count (count (:frames (first normalized)))
+        get-frame-values (fn [frame]
+                           (map (fn [animation]
+                                  (assoc-in (get-in animation [:frames frame])
+                                            [:keechma.toolbox/anim-state :forward?] forward?))
+                                normalized))]
+    (pp/make-pipeline
+     {:begin (reduce (fn [acc i]
+                       (if (= 0 i)
+                         (conj acc
+                               (fn [value app-db]
+                                 (pp/commit! (assoc-in app-db [:kv id-key id] (get-frame-values i)))))
+                         (concat acc
+                                 [raf-promise
+                                  (fn [value app-db]
+                                    (pp/commit! (assoc-in app-db [:kv id-key id] (get-frame-values i))))])))
+                     [] (range 0 final-frame-count))
+      :rescue [(fn [value app-db error]
+                 (println error))]})))
+
+
+
+
 
 (def anim-controller
   (pp-controller/constructor
    (fn [] 
      true)
-   {:animation (pp/exclusive (pipeline! [value app-db]
-                               (if (= value :forward)
-                                 (make-pipeline [:kv :anim-state] :forward
-                                                (spring/calculate-frames calc fwd (calculate-forward app-db [:kv :anim-state])))
-                                 (make-pipeline [:kv :anim-state] :back
-                                                (spring/calculate-frames calc back (calculate-back app-db [:kv :anim-state]))))))}))
+   {:start (pipeline! [value app-db]
+             
+             (rescue! [error]
+               (println error)))
+    :animation (pp/exclusive (pipeline! [value app-db]
+                               (play-animation! app-db :animation (= :forward value)
+                                                {:values {:radius [0 100]
+                                                          :alpha [1 0]
+                                                          :rotation [0 90]}
+                                                 :calculator calc}
+                                                {:values {:color ["#228b22" "#ff0000"]
+                                                          :size [100 200]}
+                                                 :calculator calc
+                                                 :delay 50})))}))
 
 (def controllers
   {:anim anim-controller})

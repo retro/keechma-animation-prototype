@@ -4,4 +4,4 @@
 (def subscriptions
   {:anim-state (fn [app-db-atom]
                  (reaction
-                  (get-in @app-db-atom [:kv :anim-state])))})
+                  (get-in @app-db-atom [:kv :keechma.toolbox.animation/id :animation])))})
