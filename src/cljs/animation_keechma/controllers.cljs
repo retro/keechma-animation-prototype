@@ -58,9 +58,11 @@
 (defn add-delay [animations forward? max-frames-count]
   (map (fn [animation]
          (if-let [delay (:delay animation)]
-           (assoc animation :frames
-                  ((if forward? add-start-frames add-end-frames)
-                   (:frames animation) (delay-to-frames-count delay max-frames-count)))
+           (let [first-position (get-in animation [:frames 0 :keechma.toolbox/anim-state :position])
+                 delay (* (.abs js/Math (- 1 first-position)) delay)]
+             (assoc animation :frames
+                    ((if forward? add-start-frames add-end-frames)
+                     (:frames animation) (delay-to-frames-count delay max-frames-count))))
            animation)) animations))
 
 (defn normalize-frames [animations forward?]
