@@ -10,8 +10,8 @@
   (:require-macros [cljs.core.async.macros :refer [go-loop]]))
 
 (.config Promise #js {:cancellation true})
-(def calc (spring/make-calculator {:tension 200 :friction 7 :overshoot-clamping? false}))
-(def calc-2 (spring/make-calculator {:tension 200 :friction 4}))
+(def calc (spring/make-calculator {:tension 40 :friction 7 :overshoot-clamping? false}))
+(def calc-2 (spring/make-calculator {:tension 40 :friction 7}))
 
 
 (def anim-path [:kv :anim-state])
@@ -37,10 +37,10 @@
   (.round js/Math (* frames-count (/ delay 100))))
 
 (defn add-start-frames [frames frame-count]
-  (into (vec (repeat frame-count (first frames))) frames))
+  (into (vec (repeat frame-count (assoc-in (first frames) [:keechma.toolbox/anim-state :placeholder?] true))) frames))
 
 (defn add-end-frames [frames frame-count]
-  (into frames (repeat frame-count (last frames))))
+  (into frames (repeat frame-count (assoc-in (last frames) [:keechma.toolbox/anim-state :placeholder?] true))))
 
 (defn add-delay [animations forward? max-frames-count]
   (map (fn [animation]
@@ -62,6 +62,11 @@
                       ((if forward? add-end-frames add-start-frames) frames (- max-frames-count frames-count)))
                animation))) animations)))
 
+(defn reverse-animations [animations forward?]
+  (if forward?
+    (vec animations)
+    (vec (reverse animations))))
+
 (defn compute-frames [app-db id forward? animations]
   (let [current-state (vec (get-in app-db [:kv id-key id]))
         animations-with-frames
@@ -72,13 +77,14 @@
         max-frames-count (apply max (map #(count (:frames %)) animations-with-frames))]
     (-> animations-with-frames
         (add-delay forward? max-frames-count)
-        (normalize-frames forward?))))
+        (normalize-frames forward?)
+        (reverse-animations forward?))))
 
 (defn get-values-for-frame [animations forward? frame]
-  (map (fn [animation]
-         (assoc-in (get-in animation [:frames frame])
-                   [:keechma.toolbox/anim-state :forward?] forward?))
-       animations))
+  (mapv (fn [animation]
+          (assoc-in (get-in animation [:frames frame])
+                    [:keechma.toolbox/anim-state :forward?] forward?))
+        animations))
 
 (defn play-animation! [app-db id forward? animations]
   (let [normalized (compute-frames app-db id forward? animations)
@@ -95,23 +101,26 @@
                                   (fn [value app-db]
                                     (pp/commit! (assoc-in app-db [:kv id-key id]
                                                           (get-values-for-frame normalized forward? i))))])))
-                     [] (range 0 final-frame-count))
-      :rescue [(fn [value app-db error]
-                 (println error))]})))
+                     [] (range 0 final-frame-count))})))
 
 (defn render-first-frame [app-db id forward? animations]
   (let [normalized (compute-frames app-db id forward? animations)]
     (assoc-in app-db [:kv id-key id] (get-values-for-frame normalized forward? 0))))
 
 (def animations
-  [{:values {:radius [0 100]
-             :alpha [1 0]
-             :rotation [0 90]}
+  [{:values {:margin-left [0 200]
+             :border-radius [0 20]
+             :background-color ["#ebf230" "#ef7204"]
+             :rotation [0 360]
+             :width [40 40]}
     :calculator calc}
-   {:values {:color ["#228b22" "#ff0000"]
-             :size [100 200]}
-    :calculator calc-2
-    :delay 50}])
+   {:values {:width [40 200]}
+    :delay 50
+    :calculator calc}
+   {:values {:width [200 40]
+             :margin-left [200 360]}
+    :delay 100
+    :calculator calc}])
 
 (def anim-controller
   (pp-controller/constructor
