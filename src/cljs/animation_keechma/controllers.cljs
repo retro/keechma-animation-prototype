@@ -68,7 +68,7 @@
                (conj with-delay (first animations))
                (inc idx))
         (let [current-animation (first animations)
-              delay (calculate-forward-delay (last with-delay) (/ (or (:delay current-animation) 0) 100))]
+              delay (calculate-forward-delay (last with-delay) (or (:delay current-animation) 0))]
           (recur (rest animations)
                  (conj with-delay (add-start-frames current-animation delay))
                  (inc idx)))))))
@@ -90,9 +90,12 @@
             (recur (rest animations)
                    (conj with-delay current-animation)
                    (inc idx))
-            (let [delay (- (count (:frames prev-animation))
-                           (- (count (:frames current-animation))
-                              (calculate-forward-delay current-animation (/ prev-delay 100))))]
+            (let [current-frames (:frames current-animation)
+                  first-position (get-in current-frames [0 :keechma.toolbox/anim-state :position])
+                  delay (* (- 1 first-position)
+                           (- (count (:frames prev-animation))
+                              (- (count current-frames)
+                                 (calculate-forward-delay current-animation prev-delay))))]
               (recur (rest animations)
                      (conj with-delay (add-start-frames current-animation delay))
                      (inc idx)))))))))
@@ -137,6 +140,14 @@
   (swap! version-counter #(+ 0.00001 %))
   @version-counter)
 
+(defn log-frames [animations]
+  (println
+   (clojure.string/join
+    "\n" (map (fn [f]
+                (clojure.string/join
+                 "" (map (fn [ff] (if (get-in ff [:keechma.toolbox/anim-state :placeholder?]) "." "*")) f)))
+              (map :frames animations)))))
+
 (defn play-animation! [app-db id forward? animations]
   (let [normalized (compute-frames app-db id forward? animations)
         final-frame-count (count (:frames (first normalized)))
@@ -172,12 +183,15 @@
              :width [40 40]}
     :calculator calc}
    {:values {:width [40 200]
-             :rotation [360 360]}
-    :delay 100
+             :rotation [360 360]
+             :margin-left [200 200]}
+    :delay 0.5
     :calculator calc}
    {:values {:width [200 40]
-             :margin-left [200 360]}
-    :delay 100
+             :rotation [360 360]
+             :margin-left [200 360]
+             :background-color ["#ef7204" "#666"]}
+    :delay 1.02
     :calculator calc}])
 
 (def anim-controller
