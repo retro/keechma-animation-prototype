@@ -134,11 +134,13 @@
                     [:keechma.toolbox/anim-state :forward?] forward?))
         animations))
 
-(def version-counter (atom 0))
 
-(defn next-version! []
-  (swap! version-counter #(+ 0.00001 %))
-  @version-counter)
+(def next-version!
+  ((fn []
+      (let [version-counter (atom 0)]
+        (fn []
+          (swap! version-counter inc)
+          @version-counter)))))
 
 (defn log-frames [animations]
   (println
@@ -184,14 +186,22 @@
     :calculator calc}
    {:values {:width [40 200]
              :rotation [360 360]
-             :margin-left [200 200]}
-    :delay 0.5
+             :margin-left [200 200]
+             }
+    :delay 1
     :calculator calc}
    {:values {:width [200 40]
              :rotation [360 360]
              :margin-left [200 360]
-             :background-color ["#ef7204" "#666"]}
-    :delay 1.02
+             :background-color ["#ef7204" "#fff"]}
+    :delay 1
+    :calculator calc}
+   {:values {:width [40 40]
+             :margin-left [360 700]
+             :rotation [360 720]
+             :border-radius [20 0]
+             :background-color ["#fff" "#3ac7ff"]}
+    :delay 1
     :calculator calc}])
 
 (def anim-controller
@@ -199,11 +209,7 @@
    (fn [] 
      true)
    {:start (pipeline! [value app-db]
-             (pp/commit! (render-first-frame app-db :animation true animations)))
-    :restart (pipeline! [value app-db]
-               (println "TEST")
-               (pp/commit! (assoc-in app-db [:kv id-key] nil))
-               (pp/commit! (render-first-frame app-db :animation true animations)))
+             (pp/commit! (render-first-frame app-db :animation true animations))) 
     :animation (pipeline! [value app-db]
                  (play-animation! app-db :animation (= :forward value) animations))}))
 

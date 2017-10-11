@@ -30,13 +30,14 @@
      [:button {:on-click #(<cmd ctx :restart true)} "Restart"]
      [:hr]
      (when anim-state
-       [:div {:style {:width (str (:width anim-state) "px")
-                      :height "40px"
+       [:div {:style {
+                      :width (str (- (:width anim-state) 4) "px")
+                      :height "36px"
                       :margin-left (str (:margin-left anim-state) "px")
                       :background-color (:background-color anim-state)
                       :border-radius (str (:border-radius anim-state) "px")
                       :transform (str "rotate(" (:rotation anim-state) "deg)")
-                      }}
+                      :border "2px solid black"}}
         ])]))
 
 (def component (ui/constructor {:renderer render
