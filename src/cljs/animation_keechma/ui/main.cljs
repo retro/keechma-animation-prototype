@@ -22,24 +22,33 @@
             {:values {} :placeholders {}} (:values state))))
 
 (defn render [ctx]
-  (let [anim-state (merge-animation-values (sub> ctx :anim-state))
-        size (:size anim-state)]
-    [:div
-     [:button {:on-mouse-down #(<cmd ctx :animation :forward)
-               :on-mouse-up #(<cmd ctx :animation :back)} "Animate"]
-     [:button {:on-click #(<cmd ctx :restart true)} "Restart"]
+  (let [{:keys [id value]} (sub> ctx :animation)]
+    [:div {:style {:box-sizing "border-box"}} "Foo - "
+     [:div
+      [:button {:on-click #(<cmd ctx :stop-animation true)} "Stop"]
+      [:button {:on-click #(<cmd ctx :cancel-animation true)} "Cancel"]]
      [:hr]
-     (when anim-state
-       [:div {:style {
-                      :width (str (- (:width anim-state) 4) "px")
-                      :height "36px"
-                      :margin-left (str (:margin-left anim-state) "px")
-                      :background-color (:background-color anim-state)
-                      :border-radius (str (:border-radius anim-state) "px")
-                      :transform (str "rotate(" (:rotation anim-state) "deg)")
-                      :border "2px solid black"}}
-        ])]))
+     (case id
+       :button-start [:button {:style {:border-radius "25px"
+                                       :height (str (:height value) "px")
+                                       :border-style "solid"
+                                       :border-width "2px"
+                                       :outline "none"
+                                       :cursor "pointer"
+                                       :overflow "hidden"
+                                       :color (:color value)
+                                       :font-size (str (:font-size value) "px")
+                                       :border-color (:border-color value)
+                                       :background "white"
+                                       :width (str (:width value) "px")
+                                       :margin-left (str (:margin-left value) "px")
+                                       :margin-top (str (:margin-top value) "px")
+                                       :padding 0}
+                               :on-mouse-down #(<cmd ctx :animate-press)
+                               :on-mouse-up #(<cmd ctx :animate-submit)}
+                      [:span {:style {:opacity (:text-opacity value)}} "Submit"]]
+       nil)]))
 
 (def component (ui/constructor {:renderer render
-                                :subscription-deps [:anim-state]
+                                :subscription-deps [:anim-state :animation]
                                 :topic :anim}))

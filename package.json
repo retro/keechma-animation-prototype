@@ -1,8 +1,11 @@
 {
   "dependencies": {
+    "bezier-easing": "^2.0.3",
     "browser-resolve": "^1.11.2",
     "dynamics.js": "^1.1.5",
+    "gravitas": "git+https://github.com/iamralpht/gravitas.js.git",
     "module-deps": "^4.1.1",
+    "rebound": "0.0.15",
     "resolve": "^1.4.0"
   }
 }

@@ -35,7 +35,9 @@
                     :asset-path           "js/dev"
                     :source-map-timestamp true
                     :install-deps true
-                    :npm-deps {:dynamics.js "1.1.5"}}}
+                    :npm-deps {:bezier-easing "2.0.3"
+                               :rebound "0.0.15"
+                               :gravitas "https://github.com/iamralpht/gravitas.js.git"}}}
 
     {:id           "min"
      :source-paths ["src/cljs"]
