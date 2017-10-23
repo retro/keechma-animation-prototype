@@ -26,7 +26,7 @@
     [:div {:style {:box-sizing "border-box"}} "Foo - "
      [:div
       [:button {:on-click #(<cmd ctx :stop-animation true)} "Stop"]
-      [:button {:on-click #(<cmd ctx :cancel-animation true)} "Cancel"]
+      [:button {:on-click #(<cmd ctx :cancel true)} "Cancel"]
       [:button {:on-click #(<cmd ctx :start true)} "Reset"]
       [:button {:on-click #(<cmd ctx :finish-loading true)} "Finish Loading"]]
      [:hr]
