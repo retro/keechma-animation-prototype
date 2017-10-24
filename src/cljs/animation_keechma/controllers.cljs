@@ -213,7 +213,6 @@
         prev-values (:data prev)
         prev-meta (:meta prev)
         init-meta (make-initial-meta identifier prev-meta)
-        _ (println "INIT META" init-meta)
         animator (ui-main/animator init-meta prev-values)
         values (ui-main/values init-meta)
         start-end (a/start-end-values (a/prepare-values prev-values) (a/prepare-values values))]
@@ -224,10 +223,9 @@
              current-meta (if (zero? times-invoked) init-meta (:meta current))
              next-position (animator/position animator)
              next-meta (assoc current-meta :times-invoked times-invoked :position next-position)
-             next-data (ui-main/step next-meta (a/get-current-styles next-position start-end))
-             done? (ui-main/done? next-meta next-data animator)
+             done? (ui-main/done? next-meta animator)
+             next-data (ui-main/step next-meta (a/get-current-styles (if done? 1 next-position) start-end))
              next-app-db (assoc-in app-db [:kv :animations id] {:data next-data :meta next-meta})]
-         (println done? next-meta next-data)
          (if done?
            (stop-task! next-app-db id)
            next-app-db))))))
@@ -235,19 +233,54 @@
 (def blocking-animate-state! (partial animate-state! blocking-animation!))
 (def non-blocking-animate-state! (partial animate-state! non-blocking-animation!))
 
+(defn ignore-task-cancellation [error]
+  (let [payload (.. error -payload -data)]
+    (when-not (contains? payload :animation-keechma.tasks/task)
+      error)))
+
+(defn get-animation-state [app-db id]
+  (get-in app-db [:kv :animations id :meta :state]))
+
 (def anim-controller
   (pp-controller/constructor
    (fn [params] true)
    {:start (pipeline! [value app-db]
              (println "STARTING")
+             (stop-task! app-db :button)
              (pp/commit! (render-animation-state app-db [:button :init]))
              (rescue! [error]
-               (println "START ERROR" error)))
+               (ignore-task-cancellation error)))
     :animate-press (pipeline! [value app-db]
-                     (blocking-animate-state! app-db [:button :pressed])
-                     (println "AFTER ANIMATION")
+                     (if (= :init (get-animation-state app-db :button))
+                       (blocking-animate-state! app-db [:button :pressed])
+                       (blocking-animate-state! app-db [:button :fail-pressed]))
                      (rescue! [error]
-                       (println "ANIMATE PRESS ERROR" error)))}))
+                       (ignore-task-cancellation error)))
+    :animate-load (pipeline! [value app-db]
+                    (if (= :pressed (get-animation-state app-db :button))
+                       (blocking-animate-state! app-db [:button :init])
+                       (blocking-animate-state! app-db [:button :fail-init]))
+                    (blocking-animate-state! app-db [:button :button-loader])
+                    (pp/commit! (render-animation-state app-db [:button :loader]))
+                    (non-blocking-animate-state! app-db [:button :loader])
+                    (delay-pipeline 1500)
+                    (when (get-in app-db [:kv :should-fail?])
+                      (throw (ex-info "BLA BLA" {})))
+                    (stop-task! app-db :button)
+                    (pp/commit! (render-animation-state app-db [:button :button-loader]))
+                    (blocking-animate-state! app-db [:button :success-notice])
+                    (blocking-animate-state! app-db [:button :init])
+                    (rescue! [error]
+                      (ignore-task-cancellation error)
+                      (pp/commit! (render-animation-state app-db [:button :button-loader]))
+                      (blocking-animate-state! app-db [:button :fail-notice])
+                      (blocking-animate-state! app-db [:button :fail-init])
+                                          
+                      (println "ERROR" error)))
+    :toggle-should-fail (pipeline! [value app-db]
+                          (pp/commit! (update-in app-db [:kv :should-fail?] not)))
+    :stop (pipeline! [value app-db]
+            (pp/commit! (stop-task! app-db :button)))}))
 
 (def controllers
   {:anim anim-controller})

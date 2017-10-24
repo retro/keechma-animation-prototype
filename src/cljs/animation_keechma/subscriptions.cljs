@@ -5,6 +5,9 @@
   {:animation (fn [app-db-atom]
                 (reaction
                  (get-in @app-db-atom [:kv :animations :button])))
+   :should-fail? (fn [app-db-atom]
+                   (reaction
+                    (get-in @app-db-atom [:kv :should-fail?])))
    :anim-state (fn [app-db-atom]
                  (reaction
                   (get-in @app-db-atom [:kv :keechma.toolbox.animation/id :animation])))})

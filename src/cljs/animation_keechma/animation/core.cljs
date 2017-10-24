@@ -63,7 +63,6 @@
                     m))) {} data)))
 
 (defn start-end-values [start end]
-  (println "START END" start end)
   (reduce-kv (fn [m k v]
                (let [end-value (get end k)
                      start-value (or v end-value)]
@@ -73,10 +72,9 @@
   end)
 
 (defn calculate-value [value start end]
-  (let [start-value (:value start)
-        end-value (:value end)
+  (let [start-value (or (:value start) (:value end))
+        end-value (or (:value end) (:value start))
         animatable (:animatable start)
-        _ (println start-value end-value animatable)
         calculator (cond
                      (= start-value end-value) identity-value
                      (= :color animatable) interpolate-color
@@ -90,9 +88,8 @@
 (defn get-current-styles [value styles]
   (reduce-kv
    (fn [m k {:keys [start end]}]
-     (println k)
      (assoc m k (if (:animatable start)
                   (calculate-value value start end)
-                  (:value start))))
+                  (:value end))))
    {} styles))
 
