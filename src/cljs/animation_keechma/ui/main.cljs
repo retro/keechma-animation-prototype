@@ -2,7 +2,46 @@
   (:require [keechma.ui-component :as ui]
             [keechma.toolbox.ui :refer [sub> <cmd]]
             [garden.color :refer [hex?]]
-            [garden.units :as units]))
+            [garden.units :as units]
+            ["gravitas/src/index" :as gravitas]))
+
+(def Spring (.-Spring gravitas))
+
+
+(defprotocol IAnimator
+  (position [this meta data])
+  (done? [this]))
+
+(extend-type Spring
+  IAnimator
+  (position [this meta data]
+    (.x this))
+  (done? [this]
+    (.done this)))
+
+(defrecord DefaultAnimator []
+  IAnimator
+  (position [this meta data]
+    1)
+  (done? [this]
+    true))
+
+(defmulti animator (fn [meta prev-data]
+                 [(:id meta) (:state meta)]))
+
+(defmethod animator :default [_ _]
+  (->DefaultAnimator))
+
+(defmulti done? (fn [meta current-data]
+                  [(:id meta) (:state meta)]))
+
+(defmethod done? :default [meta data animator]
+  (done? animator))
+
+(defmulti step (fn [meta data] [(:id meta) (:state meta)]))
+
+(defmethod step :default [meta data]
+  data)
 
 #_(case id
     :button-start [:button {:style {:border-radius "25px"
@@ -79,20 +118,7 @@
                                    }} "✔"]]
     nil)
 
-(defn extract-css-unit [value]
-  (if-let [unit (units/read-unit value)]
-    {:value (:magnitude unit) :unit (name (:unit unit)) :animatable :unit}
-    {:value value :animatable false}))
 
-(defn prepare-style [style]
-  (reduce-kv
-   (fn [m k v]
-     (assoc m k
-            (cond
-              (and (string? v) (hex? v)) {:value v :animatable :color}
-              (string? v) (extract-css-unit v)
-              (number? v) {:value v :animatable :number}
-              :else {:value v :animatable false}))) {} style))
 
 #_(def animation
   {:states {'init           {:press 'pressed}
@@ -107,119 +133,118 @@
    })
 
 
-(defn select-keys-by-namespace
-  ([data] (select-keys-by-namespace data nil))
-  ([data ns]
-   (reduce-kv (fn [m k v]
-                (let [key-ns (namespace k)]
-                  (if (= key-ns ns)
-                    (assoc m (keyword (name k)) v)
-                    m))) {} data)))
 
-(def animation
-  {:init           {:style {:border-radius    "25px"
-                            :height           "50px"
-                            :width            "200px"
-                            :border-width     "2px"
-                            :border-style     "solid"
-                            :border-color     "#03cd94"
-                            :color            "#07ce95"
-                            :background-color "#fff"
-                            :font-size        "16px"
-                            :cursor           "pointer"
-                            :outline          "none"}}
-   :pressed        {:style {:border-radius    "25px"
-                            :height           "44px"
-                            :width            "180px"
-                            :border-width     "2px"
-                            :border-style     "solid"
-                            :border-color     "#03cd94"
-                            :color            "#fff"
-                            :background-color "#03cd94"
-                            :font-size        "14px"
-                            :cursor           "pointer"
-                            :outline          "none"}}
-   :button-loader  {:style {:border-radius    "25px"
-                            :height           "50px"
-                            :width            "50px"
-                            :border-width     "4px"
-                            :border-style     "solid"
-                            :border-color     "#ccc"
-                            :color            "#fff"
-                            :background-color "#fff"
-                            :font-size        "14px"
-                            :cursor           "pointer"
-                            :outline          "none"}}
-   :loader         {:style {:border-radius   "25px"
-                            :height          "50px"
-                            :width           "50px"
-                            :display         "flex"
-                            :background      "#ccc"
-                            :overflow        "hidden"
-                            :justify-content "center"
-                            :align-items     "center"
-                            :position        "relative"}}
-   :success-notice {:style {:border-radius    "25px"
-                            :height           "50px"
-                            :width            "50px"
-                            :border-width     "4px"
-                            :border-style     "solid"
-                            :border-color     "#03cd94"
-                            :color            "#fff"
-                            :background-color "#03cd94"
-                            :font-size        "14px"
-                            :cursor           "pointer"
-                            :outline          "none"}}
-   :fail-notice    {:style {:border-radius    "25px"
-                            :height           "50px"
-                            :width            "50px"
-                            :border-width     "4px"
-                            :border-style     "solid"
-                            :border-color     "#ff3300"
-                            :color            "#fff"
-                            :background-color "#ff3300"
-                            :font-size        "14px"
-                            :cursor           "pointer"
-                            :outline          "none"}}
-   :fail-init      {:style {:border-radius    "25px"
-                            :height           "50px"
-                            :width            "200px"
-                            :border-width     "2px"
-                            :border-style     "solid"
-                            :border-color     "#ff3300"
-                            :color            "#ff3300"
-                            :background-color "#fff"
-                            :font-size        "16px"
-                            :cursor           "pointer"
-                            :outline          "none"}}
-   :fail-pressed   {:style {:border-radius    "25px"
-                            :height           "44px"
-                            :width            "180px"
-                            :border-width     "2px"
-                            :border-style     "solid"
-                            :border-color     "#ff3300"
-                            :color            "#fff"
-                            :background-color "#ff3300"
-                            :font-size        "14px"
-                            :cursor           "pointer"
-                            :outline          "none"}}})
+
+
+
+
+
+
+
+
+
+
 
 
 
 
 
-(defn render-init []
-  [:button {:style {:border-radius "25px"
-                    :height "50px"
-                    :width "200px"
-                    :border-width "2px"
-                    :border-style "solid"
-                    :border-color "#03cd94"
-                    :color "#07ce95"
-                    :background-color "#fff"
-                    :font-size "16px"
-                    :cursor "pointer"
-                    :outline "none"}}
+(def animation
+  {:id     :button
+   :states {:init           {:style {:border-radius    "25px"
+                                     :height           "50px"
+                                     :width            "200px"
+                                     :border-width     "2px"
+                                     :border-style     "solid"
+                                     :border-color     "#03cd94"
+                                     :color            "#07ce95"
+                                     :background-color "#fff"
+                                     :font-size        "16px"
+                                     :cursor           "pointer"
+                                     :outline          "none"}}
+            :pressed        {:style {:border-radius    "25px"
+                                     :height           "44px"
+                                     :width            "180px"
+                                     :border-width     "2px"
+                                     :border-style     "solid"
+                                     :border-color     "#03cd94"
+                                     :color            "#fff"
+                                     :background-color "#03cd94"
+                                     :font-size        "14px"
+                                     :cursor           "pointer"
+                                     :outline          "none"}}
+            :button-loader  {:style {:border-radius    "25px"
+                                     :height           "50px"
+                                     :width            "50px"
+                                     :border-width     "4px"
+                                     :border-style     "solid"
+                                     :border-color     "#ccc"
+                                     :color            "#fff"
+                                     :background-color "#fff"
+                                     :font-size        "14px"
+                                     :cursor           "pointer"
+                                     :outline          "none"}}
+            :loader         {:style {:border-radius   "25px"
+                                     :height          "50px"
+                                     :width           "50px"
+                                     :display         "flex"
+                                     :background      "#ccc"
+                                     :overflow        "hidden"
+                                     :justify-content "center"
+                                     :align-items     "center"
+                                     :position        "relative"}}
+            :success-notice {:style {:border-radius    "25px"
+                                     :height           "50px"
+                                     :width            "50px"
+                                     :border-width     "4px"
+                                     :border-style     "solid"
+                                     :border-color     "#03cd94"
+                                     :color            "#fff"
+                                     :background-color "#03cd94"
+                                     :font-size        "14px"
+                                     :cursor           "pointer"
+                                     :outline          "none"}}
+            :fail-notice    {:style {:border-radius    "25px"
+                                     :height           "50px"
+                                     :width            "50px"
+                                     :border-width     "4px"
+                                     :border-style     "solid"
+                                     :border-color     "#ff3300"
+                                     :color            "#fff"
+                                     :background-color "#ff3300"
+                                     :font-size        "14px"
+                                     :cursor           "pointer"
+                                     :outline          "none"}}
+            :fail-init      {:style {:border-radius    "25px"
+                                     :height           "50px"
+                                     :width            "200px"
+                                     :border-width     "2px"
+                                     :border-style     "solid"
+                                     :border-color     "#ff3300"
+                                     :color            "#ff3300"
+                                     :background-color "#fff"
+                                     :font-size        "16px"
+                                     :cursor           "pointer"
+                                     :outline          "none"}}
+            :fail-pressed   {:style {:border-radius    "25px"
+                                     :height           "44px"
+                                     :width            "180px"
+                                     :border-width     "2px"
+                                     :border-style     "solid"
+                                     :border-color     "#ff3300"
+                                     :color            "#fff"
+                                     :background-color "#ff3300"
+                                     :font-size        "14px"
+                                     :cursor           "pointer"
+                                     :outline          "none"}}}})
+
+
+
+
+
+(defn render-init [ctx anim]
+  [:button {:style (:data anim)
+            :on-mouse-down #(<cmd ctx :animate-press nil)}
    [:span {:style {:opacity 1}} "Submit"]])
 
 (defn render-pressed []
@@ -287,6 +312,8 @@
                     :outline "none"}}
    [:span {:style {:opacity 1}} "✔"]])
 
+
+
 (defn render-button-fail []
   [:button {:style {:border-radius "25px"
                     :height "50px"
@@ -330,16 +357,7 @@
    [:span {:style {:opacity 1}} "Submit"]])
 
 (defn render [ctx]
-  (let [{:keys [id value]} (sub> ctx :animation)]
-   (println (select-keys-by-namespace {:foo/bar "baz"
-                                       :bar/baz "qux"
-                                       :qux "foo"})
-            (select-keys-by-namespace {:foo/bar "baz"
-                                       :bar/baz "qux"
-                                       :qux "foo"} "foo")
-            (select-keys-by-namespace {:foo/bar "baz"
-                                       :bar/baz "qux"
-                                       :qux "foo"} "bar")) 
+  (let [anim (sub> ctx :animation)] 
     [:div {:style {:box-sizing "border-box"}} "Foo - "
      [:div
       [:button {:on-click #(<cmd ctx :stop-animation true)} "Stop"]
@@ -355,7 +373,16 @@
                                  :height "100px"
                                  :border "1px solid black"
                                  :margin-bottom "-1px"}}
-                   [renderer]]) [render-init render-pressed render-button-loader render-loader render-button-success render-button-fail render-fail-init render-fail-pressed]))]))
+                   [renderer]]) [render-pressed render-button-loader render-loader render-button-success render-button-fail render-fail-init render-fail-pressed]))
+     [:div {:style {:display "flex"
+                    :justify-content "center"
+                    :align-items "center"
+                    :height "100px"
+                    :border "1px solid black"
+                    :margin-top "101px"}}
+      (println anim)
+      (when (= :init (get-in anim [:meta :state]))
+        [render-init ctx anim])]]))
 
 (def component (ui/constructor {:renderer render
                                 :subscription-deps [:anim-state :animation]
