@@ -37,25 +37,4 @@
        (str "rgb(" r "," g "," b ")")
        (rgb->hex (map #(.round js/Math (min 255 (max % 0))) [r g b]))))))
 
-(defn make-bezier [{:keys [x1 y1 x2 y2]}]
-  (let [bezier (bezier-easing x1 y1 x2 y2)]
-    (fn [position]
-      (bezier position))))
 
-(defn make-spring [])
-
-
-
-(defn bezier-timeline [duration {:keys [x1 y1 x2 y2]}]
-  (let [bezier (bezier-easing x1 y1 x2 y2)
-        last-frame-idx (dec (.ceil js/Math (/ duration frame-duration)))]
-    (fn [frame]
-      (let [value (bezier (map-value-in-range frame 0 1 0 last-frame-idx))]
-        {:value value
-         :done? (= value 1)}))))
-
-
-
-(defn run []
-  (println rebound)
-  (println bezier-easing))

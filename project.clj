@@ -3,7 +3,9 @@
                  [org.clojure/clojurescript "1.9.854"]
                  [reagent "0.7.0"]
                  [keechma "0.3.0-SNAPSHOT-2"]
-                 [keechma/toolbox "0.1.0-SNAPSHOT-2"]]
+                 [keechma/toolbox "0.1.0-SNAPSHOT-2"]
+                 [medley "1.0.0"]]
+  
 
   :min-lein-version "2.5.3"
 

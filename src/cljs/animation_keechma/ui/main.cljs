@@ -1,28 +1,345 @@
 (ns animation-keechma.ui.main
   (:require [keechma.ui-component :as ui]
-            [keechma.toolbox.ui :refer [sub> <cmd]]))
+            [keechma.toolbox.ui :refer [sub> <cmd]]
+            [garden.color :refer [hex?]]
+            [garden.units :as units]))
 
-(defn merge-animation-values [state]
-  (:values (reduce 
-            (fn [acc frame]
-              (let [placeholder? (or (get-in frame [:keechma.toolbox/anim-state :placeholder?]) false)
-                    values (:values frame)]
-                (reduce-kv (fn [m k v]
-                             (let [value-exists? (contains? (:values m) k)
-                                   value-placeholder? (get-in m [:placeholders k])]
-                               (if (or (not value-exists?)
-                                       (and value-exists? value-placeholder? placeholder?)
-                                       (and value-exists? value-placeholder? (not placeholder?))
-                                       (and value-exists? (not value-placeholder?) (not placeholder?)))
-                                 (-> m
-                                     (assoc-in [:values k] v)
-                                     (assoc-in [:placeholders k] placeholder?))
-                                 m)
-                               )) acc values)))
-            {:values {} :placeholders {}} (:values state))))
+#_(case id
+    :button-start [:button {:style {:border-radius "25px"
+                                    :height (str (:height value) "px")
+                                    :border-style "solid"
+                                    :border-width (str (:border-width value) "px")
+                                    :outline "none"
+                                    :cursor "pointer"
+                                    :overflow "hidden"
+                                    :color (:color value)
+                                    :font-size (str (:font-size value) "px")
+                                    :border-color (:border-color value)
+                                    :background (:background-color value)
+                                    :width (str (:width value) "px")
+                                    :margin-left (str (:margin-left value) "px")
+                                    :margin-top (str (:margin-top value) "px")
+                                    :padding 0
+                                    :position "absolute"
+                                    :-webkit-tap-highlight-color "rgba(0,0,0,0)"}
+                            :on-mouse-down #(<cmd ctx :animate-press)
+                            :on-click #(<cmd ctx :animate-submit)
+                            }
+                   [:span {:style {:opacity (:text-opacity value)}} "Submit"]
+                   [:div {:style {:position "absolute"
+                                  :border-radius "100%"
+                                  :top (str (:checkmark-pos value) "px")
+                                  :left "50%"
+                                  :width (str (:checkmark-dim value) "px")
+                                  :height (str (:checkmark-dim value) "px")
+                                  :line-height "20px"
+                                  :text-align "center"
+                                  :overflow "hidden"
+                                  :color "white"
+                                  :opacity (:checkmark-opacity value)
+                                  :margin-left (str "-" (/ (:checkmark-dim value) 2) "px")
+                                  }} "✔"]]
+    :spinner-start [:div {:style {:width (str (:width value) "px")
+                                  :height "50px"
+                                  :border-radius "25px"
+                                  :background-color (:background-color value)
+                                  :margin-left (:margin-left value)
+                                  :overflow "hidden"
+                                  :position "relative"}}
+                    [:div {:style {:background "#03cd94"
+                                   :position "absolute"
+                                   :width "50px"
+                                   :height "50px"
+                                   :left "-25px"
+                                   :top "-25px"
+                                   :opacity (:spinner-opacity value)
+                                   :transform (str "rotate(" (* 6 (:rotation value)) "deg)")
+                                   :transform-origin "100% 100%"
+                                   }}]
+                    [:div {:style {:position "absolute"
+                                   :width (str (- (:width value) (- 50 (:inner-circle-dim value))) "px")
+                                   :height (str (:inner-circle-dim value) "px")
+                                   :left (str (:inner-circle-pos value) "px")
+                                   :top (str (:inner-circle-pos value) "px")
+                                   :background "white"
+                                   :border-radius (str (/ (:inner-circle-dim value) 2) "px")
+                                   :opacity (:inner-circle-opacity value)
+                                   }}]
+                    [:div {:style {:position "absolute"
+                                   :border-radius "100%"
+                                   :top (str (:checkmark-pos value) "px")
+                                   :left "50%"
+                                   :width (str (:checkmark-dim value) "px")
+                                   :height (str (:checkmark-dim value) "px")
+                                   :line-height "20px"
+                                   :text-align "center"
+                                   :overflow "hidden"
+                                   :color "white"
+                                   :margin-left (str "-" (/ (:checkmark-dim value) 2) "px")
+                                   }} "✔"]]
+    nil)
+
+(defn extract-css-unit [value]
+  (if-let [unit (units/read-unit value)]
+    {:value (:magnitude unit) :unit (name (:unit unit)) :animatable :unit}
+    {:value value :animatable false}))
+
+(defn prepare-style [style]
+  (reduce-kv
+   (fn [m k v]
+     (assoc m k
+            (cond
+              (and (string? v) (hex? v)) {:value v :animatable :color}
+              (string? v) (extract-css-unit v)
+              (number? v) {:value v :animatable :number}
+              :else {:value v :animatable false}))) {} style))
+
+#_(def animation
+  {:states {'init           {:press 'pressed}
+            'pressed        {:release 'button-loader}
+            'button-loader  {:next 'loader}
+            'loader         {:success 'success-notice
+                             :fail    'fail-notice}
+            'success-notice {:next 'init}
+            'fail-notice    {:next 'fail-init}
+            'fail-init      {:press 'fail-pressed}
+            'fail-pressed   {:release 'button-loader}}
+   })
+
+
+(defn select-keys-by-namespace
+  ([data] (select-keys-by-namespace data nil))
+  ([data ns]
+   (reduce-kv (fn [m k v]
+                (let [key-ns (namespace k)]
+                  (if (= key-ns ns)
+                    (assoc m (keyword (name k)) v)
+                    m))) {} data)))
+
+(def animation
+  {:init           {:style {:border-radius    "25px"
+                            :height           "50px"
+                            :width            "200px"
+                            :border-width     "2px"
+                            :border-style     "solid"
+                            :border-color     "#03cd94"
+                            :color            "#07ce95"
+                            :background-color "#fff"
+                            :font-size        "16px"
+                            :cursor           "pointer"
+                            :outline          "none"}}
+   :pressed        {:style {:border-radius    "25px"
+                            :height           "44px"
+                            :width            "180px"
+                            :border-width     "2px"
+                            :border-style     "solid"
+                            :border-color     "#03cd94"
+                            :color            "#fff"
+                            :background-color "#03cd94"
+                            :font-size        "14px"
+                            :cursor           "pointer"
+                            :outline          "none"}}
+   :button-loader  {:style {:border-radius    "25px"
+                            :height           "50px"
+                            :width            "50px"
+                            :border-width     "4px"
+                            :border-style     "solid"
+                            :border-color     "#ccc"
+                            :color            "#fff"
+                            :background-color "#fff"
+                            :font-size        "14px"
+                            :cursor           "pointer"
+                            :outline          "none"}}
+   :loader         {:style {:border-radius   "25px"
+                            :height          "50px"
+                            :width           "50px"
+                            :display         "flex"
+                            :background      "#ccc"
+                            :overflow        "hidden"
+                            :justify-content "center"
+                            :align-items     "center"
+                            :position        "relative"}}
+   :success-notice {:style {:border-radius    "25px"
+                            :height           "50px"
+                            :width            "50px"
+                            :border-width     "4px"
+                            :border-style     "solid"
+                            :border-color     "#03cd94"
+                            :color            "#fff"
+                            :background-color "#03cd94"
+                            :font-size        "14px"
+                            :cursor           "pointer"
+                            :outline          "none"}}
+   :fail-notice    {:style {:border-radius    "25px"
+                            :height           "50px"
+                            :width            "50px"
+                            :border-width     "4px"
+                            :border-style     "solid"
+                            :border-color     "#ff3300"
+                            :color            "#fff"
+                            :background-color "#ff3300"
+                            :font-size        "14px"
+                            :cursor           "pointer"
+                            :outline          "none"}}
+   :fail-init      {:style {:border-radius    "25px"
+                            :height           "50px"
+                            :width            "200px"
+                            :border-width     "2px"
+                            :border-style     "solid"
+                            :border-color     "#ff3300"
+                            :color            "#ff3300"
+                            :background-color "#fff"
+                            :font-size        "16px"
+                            :cursor           "pointer"
+                            :outline          "none"}}
+   :fail-pressed   {:style {:border-radius    "25px"
+                            :height           "44px"
+                            :width            "180px"
+                            :border-width     "2px"
+                            :border-style     "solid"
+                            :border-color     "#ff3300"
+                            :color            "#fff"
+                            :background-color "#ff3300"
+                            :font-size        "14px"
+                            :cursor           "pointer"
+                            :outline          "none"}}})
+
+
+
+
+
+(defn render-init []
+  [:button {:style {:border-radius "25px"
+                    :height "50px"
+                    :width "200px"
+                    :border-width "2px"
+                    :border-style "solid"
+                    :border-color "#03cd94"
+                    :color "#07ce95"
+                    :background-color "#fff"
+                    :font-size "16px"
+                    :cursor "pointer"
+                    :outline "none"}}
+   [:span {:style {:opacity 1}} "Submit"]])
+
+(defn render-pressed []
+  [:button {:style {:border-radius "25px"
+                    :height "44px"
+                    :width "180px"
+                    :border-width "2px"
+                    :border-style "solid"
+                    :border-color "#03cd94"
+                    :color "#fff"
+                    :background-color "#03cd94"
+                    :font-size "14px"
+                    :cursor "pointer"
+                    :outline "none"}}
+   [:span {:style {:opacity 1}} "Submit"]])
+
+(defn render-button-loader []
+  [:button {:style {:border-radius "25px"
+                    :height "50px"
+                    :width "50px"
+                    :border-width "4px"
+                    :border-style "solid"
+                    :border-color "#ccc"
+                    :color "#fff"
+                    :background-color "#fff"
+                    :font-size "14px"
+                    :cursor "pointer"
+                    :outline "none"}}
+   [:span {:style {:opacity 0}} "Submit"]])
+
+(defn render-loader []
+  [:div {:style {:border-radius "25px"
+                 :height "50px"
+                 :width "50px"
+                 :display "flex"
+                 :background "#ccc"
+                 :overflow "hidden"
+                 :justify-content "center"
+                 :align-items "center"
+                 :position "relative"}}
+   [:div {:style {:background "#ff3300"
+                  :width "50px"
+                  :height "25px"
+                  :margin-left "-25px"
+                  :position "absolute"
+                  :transform "rotate(23deg)"
+                  :transform-origin "100% 50%"}}]
+   [:div {:style {:border-radius "25px"
+                  :background-color "white"
+                  :width "42px"
+                  :height "42px"
+                  :position "relative"}}]])
+
+(defn render-button-success []
+  [:button {:style {:border-radius "25px"
+                    :height "50px"
+                    :width "50px"
+                    :border-width "4px"
+                    :border-style "solid"
+                    :border-color "#03cd94"
+                    :color "#fff"
+                    :background-color "#03cd94"
+                    :font-size "14px"
+                    :cursor "pointer"
+                    :outline "none"}}
+   [:span {:style {:opacity 1}} "✔"]])
+
+(defn render-button-fail []
+  [:button {:style {:border-radius "25px"
+                    :height "50px"
+                    :width "50px"
+                    :border-width "4px"
+                    :border-style "solid"
+                    :border-color "#ff3300"
+                    :color "#fff"
+                    :background-color "#ff3300"
+                    :font-size "14px"
+                    :cursor "pointer"
+                    :outline "none"}}
+   [:span {:style {:opacity 1}} "✘"]])
+
+(defn render-fail-init []
+  [:button {:style {:border-radius "25px"
+                    :height "50px"
+                    :width "200px"
+                    :border-width "2px"
+                    :border-style "solid"
+                    :border-color "#ff3300"
+                    :color "#ff3300"
+                    :background-color "#fff"
+                    :font-size "16px"
+                    :cursor "pointer"
+                    :outline "none"}}
+   [:span {:style {:opacity 1}} "Submit Failed"]])
+
+(defn render-fail-pressed []
+  [:button {:style {:border-radius "25px"
+                    :height "44px"
+                    :width "180px"
+                    :border-width "2px"
+                    :border-style "solid"
+                    :border-color "#ff3300"
+                    :color "#fff"
+                    :background-color "#ff3300"
+                    :font-size "14px"
+                    :cursor "pointer"
+                    :outline "none"}}
+   [:span {:style {:opacity 1}} "Submit"]])
 
 (defn render [ctx]
   (let [{:keys [id value]} (sub> ctx :animation)]
+   (println (select-keys-by-namespace {:foo/bar "baz"
+                                       :bar/baz "qux"
+                                       :qux "foo"})
+            (select-keys-by-namespace {:foo/bar "baz"
+                                       :bar/baz "qux"
+                                       :qux "foo"} "foo")
+            (select-keys-by-namespace {:foo/bar "baz"
+                                       :bar/baz "qux"
+                                       :qux "foo"} "bar")) 
     [:div {:style {:box-sizing "border-box"}} "Foo - "
      [:div
       [:button {:on-click #(<cmd ctx :stop-animation true)} "Stop"]
@@ -30,82 +347,15 @@
       [:button {:on-click #(<cmd ctx :start true)} "Reset"]
       [:button {:on-click #(<cmd ctx :finish-loading true)} "Finish Loading"]]
      [:hr]
-     (case id
-       :button-start [:button {:style {:border-radius "25px"
-                                       :height (str (:height value) "px")
-                                       :border-style "solid"
-                                       :border-width (str (:border-width value) "px")
-                                       :outline "none"
-                                       :cursor "pointer"
-                                       :overflow "hidden"
-                                       :color (:color value)
-                                       :font-size (str (:font-size value) "px")
-                                       :border-color (:border-color value)
-                                       :background (:background-color value)
-                                       :width (str (:width value) "px")
-                                       :margin-left (str (:margin-left value) "px")
-                                       :margin-top (str (:margin-top value) "px")
-                                       :padding 0
-                                       :position "absolute"
-                                       :-webkit-tap-highlight-color "rgba(0,0,0,0)"}
-                               ;;:on-touch-start #(<cmd ctx :animate-press)
-                               ;;:on-touch-end #(<cmd ctx :animate-submit)
-                               :on-mouse-down #(<cmd ctx :animate-press)
-                               :on-click #(<cmd ctx :animate-submit)
-                               }
-                      [:span {:style {:opacity (:text-opacity value)}} "Submit"]
-                      [:div {:style {:position "absolute"
-                                     :border-radius "100%"
-                                     :top (str (:checkmark-pos value) "px")
-                                     :left "50%"
-                                     :width (str (:checkmark-dim value) "px")
-                                     :height (str (:checkmark-dim value) "px")
-                                     :line-height "20px"
-                                     :text-align "center"
-                                     :overflow "hidden"
-                                     :color "white"
-                                     :opacity (:checkmark-opacity value)
-                                     :margin-left (str "-" (/ (:checkmark-dim value) 2) "px")
-                                      }} "✔"]]
-       :spinner-start [:div {:style {:width (str (:width value) "px")
-                                     :height "50px"
-                                     :border-radius "25px"
-                                     :background-color (:background-color value)
-                                     :margin-left (:margin-left value)
-                                     :overflow "hidden"
-                                     :position "relative"}}
-                       [:div {:style {:background "#03cd94"
-                                      :position "absolute"
-                                      :width "50px"
-                                      :height "50px"
-                                      :left "-25px"
-                                      :top "-25px"
-                                      :opacity (:spinner-opacity value)
-                                      :transform (str "rotate(" (* 6 (:rotation value)) "deg)")
-                                      :transform-origin "100% 100%"
-                                      }}]
-                       [:div {:style {:position "absolute"
-                                      :width (str (- (:width value) (- 50 (:inner-circle-dim value))) "px")
-                                      :height (str (:inner-circle-dim value) "px")
-                                      :left (str (:inner-circle-pos value) "px")
-                                      :top (str (:inner-circle-pos value) "px")
-                                      :background "white"
-                                      :border-radius (str (/ (:inner-circle-dim value) 2) "px")
-                                      :opacity (:inner-circle-opacity value)
-                                      }}]
-                       [:div {:style {:position "absolute"
-                                      :border-radius "100%"
-                                      :top (str (:checkmark-pos value) "px")
-                                      :left "50%"
-                                      :width (str (:checkmark-dim value) "px")
-                                      :height (str (:checkmark-dim value) "px")
-                                      :line-height "20px"
-                                      :text-align "center"
-                                      :overflow "hidden"
-                                      :color "white"
-                                      :margin-left (str "-" (/ (:checkmark-dim value) 2) "px")
-                                      }} "✔"]]
-       nil)]))
+     (into [:div]
+           (map (fn [renderer]
+                  [:div {:style {:display "flex"
+                                 :justify-content "center"
+                                 :align-items "center"
+                                 :height "100px"
+                                 :border "1px solid black"
+                                 :margin-bottom "-1px"}}
+                   [renderer]]) [render-init render-pressed render-button-loader render-loader render-button-success render-button-fail render-fail-init render-fail-pressed]))]))
 
 (def component (ui/constructor {:renderer render
                                 :subscription-deps [:anim-state :animation]
