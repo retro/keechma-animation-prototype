@@ -3,45 +3,40 @@
             [keechma.toolbox.ui :refer [sub> <cmd]]
             [garden.color :refer [hex?]]
             [garden.units :as units]
-            ["gravitas/src/index" :as gravitas]))
+            ["gravitas/src/index" :as gravitas]
+            [animation-keechma.animation.animator :as animator]))
 
 (def Spring (.-Spring gravitas))
 
 
-(defprotocol IAnimator
-  (position [this meta data])
-  (done? [this]))
 
 (extend-type Spring
-  IAnimator
-  (position [this meta data]
+  animator/IAnimator
+  (position [this]
     (.x this))
   (done? [this]
     (.done this)))
 
-(defrecord DefaultAnimator []
-  IAnimator
-  (position [this meta data]
-    1)
-  (done? [this]
-    true))
 
-(defmulti animator (fn [meta prev-data]
-                 [(:id meta) (:state meta)]))
+(defn dispatcher [meta & args] [(:id meta) (:state meta)])
+
+
+(defmulti animator dispatcher)
+(defmulti step dispatcher)
+(defmulti done? dispatcher)
+(defmulti values dispatcher)
 
 (defmethod animator :default [_ _]
-  (->DefaultAnimator))
-
-(defmulti done? (fn [meta current-data]
-                  [(:id meta) (:state meta)]))
+  (animator/->DefaultAnimator))
 
 (defmethod done? :default [meta data animator]
-  (done? animator))
-
-(defmulti step (fn [meta data] [(:id meta) (:state meta)]))
+  (animator/done? animator))
 
 (defmethod step :default [meta data]
   data)
+
+(defmethod values :default [meta]
+  {})
 
 #_(case id
     :button-start [:button {:style {:border-radius "25px"
@@ -137,9 +132,31 @@
 
 
 
+(defmethod values [:button :init] [_]
+  {:border-radius    "25px"
+   :height           "50px"
+   :width            "200px"
+   :border-width     "2px"
+   :border-style     "solid"
+   :border-color     "#03cd94"
+   :color            "#07ce95"
+   :background-color "#fff"
+   :font-size        "16px"
+   :cursor           "pointer"
+   :outline          "none"})
 
-
-
+(defmethod values [:button :opressed] [_]
+  {:border-radius    "25px"
+   :height           "44px"
+   :width            "180px"
+   :border-width     "2px"
+   :border-style     "solid"
+   :border-color     "#03cd94"
+   :color            "#fff"
+   :background-color "#03cd94"
+   :font-size        "14px"
+   :cursor           "pointer"
+   :outline          "none"})
 
 
 
@@ -151,28 +168,8 @@
 
 (def animation
   {:id     :button
-   :states {:init           {:style {:border-radius    "25px"
-                                     :height           "50px"
-                                     :width            "200px"
-                                     :border-width     "2px"
-                                     :border-style     "solid"
-                                     :border-color     "#03cd94"
-                                     :color            "#07ce95"
-                                     :background-color "#fff"
-                                     :font-size        "16px"
-                                     :cursor           "pointer"
-                                     :outline          "none"}}
-            :pressed        {:style {:border-radius    "25px"
-                                     :height           "44px"
-                                     :width            "180px"
-                                     :border-width     "2px"
-                                     :border-style     "solid"
-                                     :border-color     "#03cd94"
-                                     :color            "#fff"
-                                     :background-color "#03cd94"
-                                     :font-size        "14px"
-                                     :cursor           "pointer"
-                                     :outline          "none"}}
+   :states {:init           {:style {}}
+            :pressed        {:style {}}
             :button-loader  {:style {:border-radius    "25px"
                                      :height           "50px"
                                      :width            "50px"
@@ -357,7 +354,8 @@
    [:span {:style {:opacity 1}} "Submit"]])
 
 (defn render [ctx]
-  (let [anim (sub> ctx :animation)] 
+  (let [anim (sub> ctx :animation)
+        anim-state (get-in anim [:meta :state])] 
     [:div {:style {:box-sizing "border-box"}} "Foo - "
      [:div
       [:button {:on-click #(<cmd ctx :stop-animation true)} "Stop"]
@@ -381,7 +379,7 @@
                     :border "1px solid black"
                     :margin-top "101px"}}
       (println anim)
-      (when (= :init (get-in anim [:meta :state]))
+      (when (contains? #{:init :pressed} anim-state)
         [render-init ctx anim])]]))
 
 (def component (ui/constructor {:renderer render

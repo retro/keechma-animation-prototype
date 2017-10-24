@@ -13,7 +13,8 @@
                                              non-blocking-animation!
                                              stop-task!
                                              cancel-task!]]
-            [animation-keechma.ui.main :as ui-main :refer [animation]]))
+            [animation-keechma.ui.main :as ui-main :refer [animation]]
+            [animation-keechma.animation.animator :as animator]))
 
 
 #_(def anim-controller
@@ -195,37 +196,56 @@
                (js/setTimeout resolve msec))))
 
 (defn make-initial-meta
-  ([id state] (make-initial-meta id state nil))
-  ([id state prev]
+  ([identifier] (make-initial-meta identifier nil))
+  ([[id state] prev]
    {:id id :state state :position 0 :times-invoked 0 :prev nil}))
 
-(defn render-animation-state [app-db animation state]
-  (let [id (:id animation)]
+(defn render-animation-state [app-db identifier]
+  (let [[id _] identifier
+        init-meta (make-initial-meta identifier)]
     (assoc-in app-db [:kv :animations id]
-              {:data (get-in animation [:states state :style])
-               :meta (make-initial-meta id state)})))
+              {:data (ui-main/values init-meta)
+               :meta init-meta})))
 
-(defn animate-state [app-db animation state]
-  (let [id (:id animation)
+(defn animate-state! [task-runner! app-db identifier]
+  (let [[id state] identifier
         prev (get-in app-db [:kv :animations id])
-        init-meta (make-initial-meta id state (:meta prev))
-        animator (ui-main/animator init-meta (:data prev))]
-    (fn [{:keys [times-invoked]} app-db]
-      (let [current (get-in app-db [:kv :animations id])
-            anim-meta (if (zero? times-invoked) init-meta)
-            next-data (ui-main/step )]))))
+        prev-values (:data prev)
+        prev-meta (:meta prev)
+        init-meta (make-initial-meta identifier prev-meta)
+        _ (println "INIT META" init-meta)
+        animator (ui-main/animator init-meta prev-values)
+        values (ui-main/values init-meta)
+        start-end (a/start-end-values (a/prepare-values prev-values) (a/prepare-values values))]
+    (task-runner!
+     id
+     (fn [{:keys [times-invoked]} app-db]
+       (let [current (get-in app-db [:kv :animations id])
+             current-meta (if (zero? times-invoked) init-meta (:meta current))
+             next-position (animator/position animator)
+             next-meta (assoc current-meta :times-invoked times-invoked :position next-position)
+             next-data (ui-main/step next-meta (a/get-current-styles next-position start-end))
+             done? (ui-main/done? next-meta next-data animator)
+             next-app-db (assoc-in app-db [:kv :animations id] {:data next-data :meta next-meta})]
+         (println done? next-meta next-data)
+         (if done?
+           (stop-task! next-app-db id)
+           next-app-db))))))
+
+(def blocking-animate-state! (partial animate-state! blocking-animation!))
+(def non-blocking-animate-state! (partial animate-state! non-blocking-animation!))
 
 (def anim-controller
   (pp-controller/constructor
    (fn [params] true)
    {:start (pipeline! [value app-db]
              (println "STARTING")
-             (pp/commit! (render-animation-state app-db animation :init))
+             (pp/commit! (render-animation-state app-db [:button :init]))
              (rescue! [error]
                (println "START ERROR" error)))
     :animate-press (pipeline! [value app-db]
-                     (animate-state app-db animation :pressed)
-                     ;;(blocking-animation! (animate-state app-db animation :pressed))
+                     (blocking-animate-state! app-db [:button :pressed])
+                     (println "AFTER ANIMATION")
                      (rescue! [error]
                        (println "ANIMATE PRESS ERROR" error)))}))
 

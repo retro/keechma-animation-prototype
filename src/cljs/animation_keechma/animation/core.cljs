@@ -43,7 +43,7 @@
     {:value (:magnitude unit) :unit (name (:unit unit)) :animatable :unit}
     {:value value :animatable false}))
 
-(defn prepare-style [style]
+(defn prepare-values [style]
   (reduce-kv
    (fn [m k v]
      (assoc m k
@@ -62,16 +62,37 @@
                     (assoc m (keyword (name k)) v)
                     m))) {} data)))
 
-(defn start-end-styles [start end]
+(defn start-end-values [start end]
+  (println "START END" start end)
   (reduce-kv (fn [m k v]
-               (assoc m k {:start v :end (get end k)})) {} start))
+               (let [end-value (get end k)
+                     start-value (or v end-value)]
+                 (assoc m k {:start start-value :end end-value}))) {} start))
+
+(defn identity-value [_ _ end]
+  end)
+
+(defn calculate-value [value start end]
+  (let [start-value (:value start)
+        end-value (:value end)
+        animatable (:animatable start)
+        _ (println start-value end-value animatable)
+        calculator (cond
+                     (= start-value end-value) identity-value
+                     (= :color animatable) interpolate-color
+                     (or (= :unit animatable) (:number animatable)) map-value-in-range
+                     :else identity-value)
+        new-value (calculator value start-value end-value)]
+    (if (= :unit animatable)
+      (str new-value (:unit start))
+      new-value)))
 
 (defn get-current-styles [value styles]
-  (reduce-kv (fn [m k {:keys [start end]}]
-               (let [current (cond
-                               (= start end) end
-                               (string? start) (interpolate-color value start (or end start))
-                               :else (map-value-in-range value start (or end start)))]
-                 (assoc m k current)))
-             {} styles))
+  (reduce-kv
+   (fn [m k {:keys [start end]}]
+     (println k)
+     (assoc m k (if (:animatable start)
+                  (calculate-value value start end)
+                  (:value start))))
+   {} styles))
 
