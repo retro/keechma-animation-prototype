@@ -1,7 +1,8 @@
 (ns animation-keechma.tasks
   (:require [cljs.core.async :refer [<! put! take! chan close!]]
             [medley.core :refer [dissoc-in]]
-            [promesa.core :as p])
+            [promesa.core :as p]
+            [keechma.toolbox.pipeline.core :as pp])
   (:import [goog.async AnimationDelay])
   (:require-macros [cljs.core.async.macros :refer [go-loop]]))
 
@@ -15,18 +16,6 @@
     (wait-delay)
     #(reset! is-running? false)))
 
-(defn window-resize-runner [res-chan]
-  (let [handler (fn [e]
-                  (put! res-chan {:width (.-innerWidth js/window)
-                                  :height (.-innerHeight js/window)}))]
-    (.addEventListener js/window "resize" handler)
-    #(.removeEventListener js/window "resize" handler)))
-
-(defn window-mouse-move-runner [res-chan]
-  (let [handler #(put! res-chan {:x (.-screenX %)  :y (.-screenY %)})]
-    (.addEventListener js/window "mousemove" handler)
-    #(.removeEventListener js/window "mousemove" handler)))
-
 (defn register-task
   ([app-db id runner-chan] (register-task app-db id runner-chan ::running))
   ([app-db id runner-chan state]
@@ -36,7 +25,7 @@
          (assoc-in [:kv ::tasks id :states version] state)
          (assoc-in [:kv ::tasks id :chans version] runner-chan)))))
 
-(defn update-task-state [state]
+(defn update-task-state! [state]
   (fn [app-db id]
     (let [current (get-in app-db [:kv ::tasks id])
           version (:version current)
@@ -47,13 +36,26 @@
                  (or (= ::stopped state)
                      (= ::cancelled state)))
         (close! runner-chan))
+      (pp/commit!
+       (if version
+         (assoc-in app-db [:kv ::tasks id :states version] state)
+         app-db)))))
+
+(def stop-task! (update-task-state! ::stopped))
+(def cancel-task! (update-task-state! ::cancelled))
+
+(defn update-task-state [state]
+  (fn [app-db id]
+    (let [current (get-in app-db [:kv ::tasks id])
+          version (:version current)
+          states (:states current)
+          current-state (get states version)] 
       (if version
         (assoc-in app-db [:kv ::tasks id :states version] state)
         app-db))))
 
-(def stop-task! (update-task-state ::stopped))
-
-(def cancel-task! (update-task-state ::cancelled))
+(def stop-task (update-task-state ::stopped))
+(def cancel-task (update-task-state ::cancelled))
 
 (defn clear-task-version [app-db id version]
   (-> app-db
@@ -85,8 +87,7 @@
                          (reset! app-db-atom (clear-task-version @app-db-atom id version))
                          (resolve))]
       (go-loop [times-invoked 0]
-        (let [runner-value (<! runner-chan)
-              current (get-in @app-db-atom [:kv ::tasks id])
+        (let [current (get-in @app-db-atom [:kv ::tasks id])
               current-version (:version current)
               state (get-in current [:states version])]
           (cond
@@ -95,7 +96,7 @@
             (= ::stopped state) (task-resolve)
             :else
             
-            (when runner-value
+            (when-let [runner-value (<! runner-chan)]
               (let [new-app-db (reducer {:times-invoked times-invoked :started-at started-at :id id :value runner-value} @app-db-atom)]
                 (reset! app-db-atom new-app-db)
                 (recur (inc times-invoked))))))))))
@@ -129,6 +130,5 @@
 (defn non-blocking-task! [producer id reducer]
   (with-meta (partial non-blocking-task-runner producer id reducer) {:pipeline? true}))
 
-
-(def blocking-animation! (partial blocking-task! raf-runner))
-(def non-blocking-animation! (partial non-blocking-task! raf-runner))
+(def blocking-raf! (partial blocking-task! raf-runner))
+(def non-blocking-raf! (partial non-blocking-task! raf-runner))
