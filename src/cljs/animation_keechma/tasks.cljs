@@ -47,7 +47,9 @@
                  (or (= ::stopped state)
                      (= ::cancelled state)))
         (close! runner-chan))
-      (assoc-in app-db [:kv ::tasks id :states version] state))))
+      (if version
+        (assoc-in app-db [:kv ::tasks id :states version] state)
+        app-db))))
 
 (def stop-task! (update-task-state ::stopped))
 
@@ -72,11 +74,11 @@
     (let [started-at (.getTime (js/Date.))
           runner-cancel (producer runner-chan)
           version (get-in @app-db-atom [:kv ::tasks id :version])
-          task-reject (fn [payload]
+          task-break (fn []
                         (close! runner-chan)
                         (runner-cancel)
                         (reset! app-db-atom (clear-task-version @app-db-atom id version))
-                        (reject payload))
+                        (resolve :keechma.toolbox.pipeline.core/break))
           task-resolve (fn []
                          (close! runner-chan)
                          (runner-cancel)
@@ -88,8 +90,8 @@
               current-version (:version current)
               state (get-in current [:states version])]
           (cond
-            (and (= ::running state) (not= version current-version)) (task-reject (ex-task-cancelled id version))
-            (= ::cancelled state) (task-reject (ex-task-cancelled id version))
+            (and (= ::running state) (not= version current-version)) (task-break)
+            (= ::cancelled state) (task-break)
             (= ::stopped state) (task-resolve)
             :else
             

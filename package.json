@@ -6,6 +6,6 @@
     "gravitas": "git+https://github.com/iamralpht/gravitas.js.git",
     "module-deps": "^4.1.1",
     "rebound": "0.0.15",
-    "resolve": "^1.4.0"
+    "resolve": "^1.5.0"
   }
 }

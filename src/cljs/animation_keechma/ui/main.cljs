@@ -114,8 +114,11 @@
    :cursor           "pointer"
    :outline          "none"})
 
-(defmethod animator [:button :button-loader] [_]
-  (make-spring {:spring 800 :damping 20}))
+(defmethod animator [:button :button-loader] [meta]
+  (let [prev (:prev meta)]
+    (if (= :init (:state prev))
+      (make-spring {:spring 800 :damping 20})
+      (make-spring {:spring 500 :damping 20}))))
 
 (defmethod done? [:button :button-loader] [meta animator]
   (or (animator/done? animator)

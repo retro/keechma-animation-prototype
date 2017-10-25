@@ -60,7 +60,10 @@
 (def non-blocking-animate-state! (partial animate-state! non-blocking-animation!))
 
 (defn ignore-task-cancellation [error]
-  (let [payload (.. error -payload -data)]
+  (let [payload (.-data error)]
+    
+    (println "PAYLOAD" payload ;;payload (contains? payload :animation-keechma.tasks/task)
+             )
     (when-not (contains? payload :animation-keechma.tasks/task)
       error)))
 
@@ -72,17 +75,22 @@
    (fn [params] true)
    {:start (pipeline! [value app-db]
              (println "STARTING")
-             (stop-task! app-db :button)
+             (pp/commit! (cancel-task! app-db :button))
              (pp/commit! (render-animation-end app-db [:button :init]))
              (rescue! [error]
-               (ignore-task-cancellation error)))
+               
+               (println "++++++" error)))
     :animate-press (pipeline! [value app-db]
+                     (pp/commit! (cancel-task! app-db :button))
+
                      (if (= :init (get-animation-state app-db :button))
                        (blocking-animate-state! app-db [:button :pressed])
                        (blocking-animate-state! app-db [:button :fail-pressed]))
                      (rescue! [error]
-                       (ignore-task-cancellation error)))
+                       (println "*****" error)))
     :animate-load (pipeline! [value app-db]
+                    (pp/commit! (cancel-task! app-db :button))
+
                     (if (= :pressed (get-animation-state app-db :button))
                        (blocking-animate-state! app-db [:button :init])
                        (blocking-animate-state! app-db [:button :fail-init]))
@@ -92,12 +100,11 @@
                     (delay-pipeline 1500)
                     (when (get-in app-db [:kv :should-fail?])
                       (throw (ex-info "BLA BLA" {})))
-                    (stop-task! app-db :button)
+                    (pp/commit! (stop-task! app-db :button))
                     (pp/commit! (render-animation-end app-db [:button :button-loader]))
                     (blocking-animate-state! app-db [:button :success-notice])
                     (blocking-animate-state! app-db [:button :init])
                     (rescue! [error]
-                      (ignore-task-cancellation error)
                       (pp/commit! (render-animation-end app-db [:button :button-loader]))
                       (blocking-animate-state! app-db [:button :fail-notice])
                       (blocking-animate-state! app-db [:button :fail-init])
