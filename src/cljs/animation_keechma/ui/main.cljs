@@ -39,7 +39,7 @@
        (.setEnd (:end config))))))
 
 
-(defmethod a/values [:button :init] [_]
+(defmethod a/values :button/init [_]
   {:border-radius    "25px"
    :height           "50px"
    :width            "200px"
@@ -52,17 +52,17 @@
    :cursor           "pointer"
    :outline          "none"})
 
-(defmethod a/animator [:button :init] [meta data]
+(defmethod a/animator :button/init [meta data]
   (let [prev (:prev meta)]
     (if (= :pressed (:state prev))
       (make-spring {:position (- 1 (:position prev)) :weight 0.9 :spring 800 :damping 40})
       (make-spring))))
 
-(defmethod a/done? [:button :init] [meta animator]
+(defmethod a/done? :button/init [meta animator]
   (or (animator/done? animator)
       (> (:position meta) 1.02)))
 
-(defmethod a/values [:button :pressed] [_]
+(defmethod a/values :button/pressed [_]
   {:border-radius    "25px"
    :height           "44px"
    :width            "180px"
@@ -75,15 +75,15 @@
    :cursor           "pointer"
    :outline          "none"})
 
-(defmethod a/animator [:button :pressed] [meta data]
+(defmethod a/animator :button/pressed [meta data]
   (make-spring {:weight 0.9 :spring 800 :damping 40}))
 
-(defmethod a/done? [:button :pressed] [meta animator]
+(defmethod a/done? :button/pressed [meta animator]
   (or (animator/done? animator)
       (> (:position meta) 1.02)))
 
 
-(defmethod a/values [:button :button-loader] [_]
+(defmethod a/values :button/button-loader [_]
   {:border-radius    "25px"
    :height           "50px"
    :width            "50px"
@@ -96,24 +96,24 @@
    :cursor           "pointer"
    :outline          "none"})
 
-(defmethod a/animator [:button :button-loader] [meta]
+(defmethod a/animator :button/button-loader [meta]
   (let [prev (:prev meta)]
     (if (= :init (:state prev))
       (make-spring {:spring 800 :damping 20})
       (make-spring {:spring 500 :damping 20}))))
 
-(defmethod a/done? [:button :button-loader] [meta animator]
+(defmethod a/done? :button/button-loader [meta animator]
   (or (animator/done? animator)
       (> (:position meta) 1)))
 
 
-(defmethod a/animator [:button :loader] [_]
+(defmethod a/animator :button/loader [_]
   (->FrameAnimator))
 
-(defmethod a/step [:button :loader] [meta data]
+(defmethod a/step :button/loader [meta data]
   {:rotation (str "rotate(" (* 5 (:times-invoked meta)) "deg)")})
 
-(defmethod a/values [:button :success-notice] [_]
+(defmethod a/values :button/success-notice [_]
   {:border-radius    "25px"
    :height           "50px"
    :width            "200px"
@@ -126,10 +126,10 @@
    :cursor           "pointer"
    :outline          "none"})
 
-(defmethod a/animator [:button :success-notice] [_]
+(defmethod a/animator :button/success-notice [_]
   (make-spring {:damping 40}))
 
-(defmethod a/values [:button :fail-notice] [_]
+(defmethod a/values :button/fail-notice [_]
   {:border-radius    "25px"
    :height           "50px"
    :width            "260px"
@@ -142,10 +142,10 @@
    :cursor           "pointer"
    :outline          "none"})
 
-(defmethod a/animator [:button :fail-notice] [_]
+(defmethod a/animator :button/fail-notice [_]
   (make-spring {:damping 40}))
 
-(defmethod a/values [:button :fail-init] [_]
+(defmethod a/values :button/fail-init [_]
   {:border-radius    "25px"
    :height           "50px"
    :width            "260px"
@@ -158,18 +158,18 @@
    :cursor           "pointer"
    :outline          "none"})
 
-(defmethod a/animator [:button :fail-init] [meta data]
+(defmethod a/animator :button/fail-init [meta data]
   (let [prev (:prev meta)]
     (if (= :pressed (:state prev))
       (make-spring {:position (- 1 (:position prev)) :weight 0.9 :spring 800 :damping 40})
       (make-spring))))
 
-(defmethod a/done? [:button :fail-init] [meta animator]
+(defmethod a/done? :button/fail-init [meta animator]
   (or (animator/done? animator)
       (> (:position meta) 1.02)))
 
 
-(defmethod a/values [:button :fail-pressed] [_]
+(defmethod a/values :button/fail-pressed [_]
   {:border-radius    "25px"
    :height           "44px"
    :width            "240px"
@@ -182,10 +182,10 @@
    :cursor           "pointer"
    :outline          "none"})
 
-(defmethod a/animator [:button :fail-pressed] [meta data]
+(defmethod a/animator :button/fail-pressed [meta data]
   (make-spring {:weight 0.9 :spring 800 :damping 40}))
 
-(defmethod a/done? [:button :fail-pressed] [meta animator]
+(defmethod a/done? :button/fail-pressed [meta animator]
   (or (animator/done? animator)
       (> (:position meta) 1.02)))
 

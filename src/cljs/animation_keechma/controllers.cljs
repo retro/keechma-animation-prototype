@@ -13,58 +13,53 @@
                                              non-blocking-raf!
                                              stop-task!
                                              cancel-task!]]
-           [animation-keechma.animation.core :refer [render-animation-end blocking-animate-state! non-blocking-animate-state!]]
-           [animation-keechma.animation.helpers :refer [get-animation-state]]))
+           [animation-keechma.animation.core :refer [render-animation-end blocking-animate-state! non-blocking-animate-state! get-animation-state animation-id cancel-animation! stop-animation!]]))
 
 
 (defn delay-pipeline [msec]
   (p/promise (fn [resolve reject]
                (js/setTimeout resolve msec))))
 
+(def version [:create-user :form])
 
 (def anim-controller
   (pp-controller/constructor
    (fn [params] true)
    {:start (pipeline! [value app-db]
              (println "STARTING")
-             (cancel-task! app-db :button)
-             (pp/commit! (render-animation-end app-db [:button :init]))
+             (cancel-animation! app-db :button version)
+             (pp/commit! (render-animation-end app-db :button/init version))
              (rescue! [error]
-               
-               (println "++++++" error)))
+               (println error)))
     :animate-press (pipeline! [value app-db]
-                    (cancel-task! app-db :button)
-                     (if (= :init (get-animation-state app-db :button))
-                       (blocking-animate-state! app-db [:button :pressed])
-                       (blocking-animate-state! app-db [:button :fail-pressed]))
-                     (rescue! [error]
-                       (println "*****" error)))
+                    (cancel-animation! app-db :button version)
+                     (if (= :init (get-animation-state app-db :button version))
+                       (blocking-animate-state! app-db :button/pressed version)
+                       (blocking-animate-state! app-db :button/fail-pressed version)))
     :animate-load (pipeline! [value app-db]
-                    (cancel-task! app-db :button)
+                    (cancel-animation! app-db :button version)
 
-                    (if (= :pressed (get-animation-state app-db :button))
-                       (blocking-animate-state! app-db [:button :init])
-                       (blocking-animate-state! app-db [:button :fail-init]))
-                    (blocking-animate-state! app-db [:button :button-loader])
-                    (pp/commit! (render-animation-end app-db [:button :loader]))
-                    (non-blocking-animate-state! app-db [:button :loader])
+                    (if (= :pressed (get-animation-state app-db :button version))
+                      (blocking-animate-state! app-db :button/init version)
+                      (blocking-animate-state! app-db :button/fail-init version))
+                    (blocking-animate-state! app-db :button/button-loader version)
+                    (pp/commit! (render-animation-end app-db :button/loader version))
+                    (non-blocking-animate-state! app-db :button/loader version)
                     (delay-pipeline 1500)
                     (when (get-in app-db [:kv :should-fail?])
                       (throw (ex-info "BLA BLA" {})))
-                    (stop-task! app-db :button)
-                    (pp/commit! (render-animation-end app-db [:button :button-loader]))
-                    (blocking-animate-state! app-db [:button :success-notice])
-                    (blocking-animate-state! app-db [:button :init])
+                    (stop-animation! app-db :button version)
+                    (pp/commit! (render-animation-end app-db :button/button-loader version))
+                    (blocking-animate-state! app-db :button/success-notice version)
+                    (blocking-animate-state! app-db :button/init version)
                     (rescue! [error]
-                      (pp/commit! (render-animation-end app-db [:button :button-loader]))
-                      (blocking-animate-state! app-db [:button :fail-notice])
-                      (blocking-animate-state! app-db [:button :fail-init])
-                                          
-                      (println "ERROR" error)))
+                      (pp/commit! (render-animation-end app-db :button/button-loader version))
+                      (blocking-animate-state! app-db :button/fail-notice version)
+                      (blocking-animate-state! app-db :button/fail-init version)))
     :toggle-should-fail (pipeline! [value app-db]
                           (pp/commit! (update-in app-db [:kv :should-fail?] not)))
     :stop (pipeline! [value app-db]
-            (stop-task! app-db :button))}))
+            (stop-animation! app-db :button version))}))
 
 (def controllers
   {:anim anim-controller})

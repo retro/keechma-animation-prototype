@@ -89,6 +89,3 @@
                   (calculate-value value start end)
                   (:value end))))
    {} styles))
-
-(defn get-animation-state [app-db id]
-  (get-in app-db [:kv :animations id :meta :state]))
